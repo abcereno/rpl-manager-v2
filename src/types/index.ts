@@ -2,9 +2,18 @@ export type UserRole = 'student' | 'portfolio_team' | 'rto_assessor' | 'admin';
 
 export type EvidenceStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 'endorsed';
 
+export interface Comment {
+  id: string;
+  author: string;
+  authorAvatar?: string;
+  comment: string;
+  createdAt: Date;
+}
+
 export interface Evidence {
   id: string;
   studentId: string;
+  unitId: string;
   title: string;
   description: string;
   fileType: 'photo' | 'video' | 'document';
@@ -13,6 +22,23 @@ export interface Evidence {
   status: EvidenceStatus;
   reviewedBy?: string;
   reviewNotes?: string;
+  comments?: Comment[];
+}
+
+export interface Unit {
+    id: string;
+    code: string;
+    name: string;
+    description: string;
+    evidenceCount: number;
+}
+
+export interface Qualification {
+    id: string;
+    name: string;
+    code: string;
+    progress: number;
+    units: Unit[];
 }
 
 export interface Student {
@@ -28,6 +54,7 @@ export interface Student {
   assignedTo?: string;
   rtoAssignedTo?: string;
   companyId?: string;
+  qualifications: Qualification[];
 }
 
 export interface User {
@@ -46,3 +73,4 @@ export interface Company {
   primaryColor: string;
   secondaryColor: string;
 }
+
