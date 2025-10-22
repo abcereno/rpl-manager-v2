@@ -73,4 +73,3 @@ export interface Company {
   primaryColor: string;
   secondaryColor: string;
 }
-

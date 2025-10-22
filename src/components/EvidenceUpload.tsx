@@ -140,4 +140,3 @@ export const EvidenceUpload: React.FC<EvidenceUploadProps> = ({ onUpload }) => {
     </div>
   );
 };
-

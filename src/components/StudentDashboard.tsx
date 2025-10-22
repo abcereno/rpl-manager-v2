@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { EvidenceUpload, UploadPayload } from './EvidenceUpload';
-import { ProgressBar } from './ui/ProgressBar';
+import { EvidenceUpload, UploadPayload } from '@/components/EvidenceUpload';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockStudents, mockEvidence } from '../data/mockData';
-import { Evidence, Unit, Qualification, Comment } from '../types';
+import { mockStudents, mockEvidence } from '@/data/mockData';
+import { Evidence, Unit, Qualification, Comment } from '@/types';
 import { FileText, Camera, Video, AlertTriangle, CheckCircle, Clock, MessageSquare } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { UnitCommentsModal } from './UnitCommentsModal';
 
 
 // Helper component to render an icon based on file type
@@ -115,6 +117,8 @@ const EvidenceList = ({ unitId }: { unitId: string }) => {
 export const StudentDashboard: React.FC = () => {
   const [activeUnit, setActiveUnit] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [viewingCommentsForUnit, setViewingCommentsForUnit] = useState<Unit | null>(null);
+
 
   const handleUpload = (payload: UploadPayload[]) => {
     console.log(`Uploading ${payload.length} files for unit ${activeUnit}:`, payload);
@@ -122,8 +126,19 @@ export const StudentDashboard: React.FC = () => {
     setActiveUnit(null); // Close accordion on upload
     setTimeout(() => setUploadSuccess(false), 5000); // Hide message after 5 seconds
   };
+  
+  const handleViewComments = (e: React.MouseEvent | React.KeyboardEvent, unit: Unit) => {
+    e.stopPropagation(); // Prevent the accordion from toggling
+    setViewingCommentsForUnit(unit);
+  };
 
   const studentData = mockStudents[0];
+
+  const allCommentsForUnit = viewingCommentsForUnit
+    ? mockEvidence
+        .filter(e => e.unitId === viewingCommentsForUnit.id && e.comments)
+        .flatMap(e => e.comments as Comment[])
+    : [];
 
   return (
     <div className="space-y-8">
@@ -172,15 +187,27 @@ export const StudentDashboard: React.FC = () => {
                         <Accordion type="single" collapsible className="w-full" onValueChange={setActiveUnit} value={activeUnit ?? ""}>
                         {qualification.units.map((unit: Unit) => (
                             <AccordionItem value={unit.id} key={unit.id}>
-                            <AccordionTrigger className="hover:bg-gray-50 px-4 rounded-lg transition-colors">
-                                <div className="flex items-center gap-4 text-left flex-1">
-                                    <div className="flex-grow">
-                                        <p className="font-bold text-md text-[#373b40]">{unit.code}</p>
-                                        <p className="text-sm text-gray-600">{unit.name}</p>
+                                <AccordionTrigger className="hover:bg-gray-50 px-4 rounded-lg transition-colors">
+                                    <div className="flex items-center gap-4 text-left flex-1">
+                                        <div className="flex-grow">
+                                            <p className="font-bold text-md text-[#373b40]">{unit.code}</p>
+                                            <p className="text-sm text-gray-600">{unit.name}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <Badge variant="outline" className="ml-4">{mockEvidence.filter(e => e.unitId === unit.id).length} Evidence</Badge>
-                            </AccordionTrigger>
+                                    <div className='flex items-center gap-2' onClick={(e) => e.stopPropagation()}>
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) => handleViewComments(e, unit)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleViewComments(e, unit); }}
+                                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-primary hover:bg-primary/10 h-8 px-2"
+                                        >
+                                            <MessageSquare className="h-4 w-4 mr-2" />
+                                            Feedback
+                                        </div>
+                                        <Badge variant="outline">{mockEvidence.filter(e => e.unitId === unit.id).length} Evidence</Badge>
+                                    </div>
+                                </AccordionTrigger>
                             <AccordionContent className="px-4 pt-4 pb-6 bg-gray-50 border-t">
                                 <p className="text-sm text-gray-600 mb-6">{unit.description}</p>
                                 <EvidenceList unitId={unit.id} />
@@ -197,6 +224,13 @@ export const StudentDashboard: React.FC = () => {
             </TabsContent>
         ))}
       </Tabs>
+      
+      <UnitCommentsModal
+        unit={viewingCommentsForUnit}
+        comments={allCommentsForUnit}
+        isOpen={!!viewingCommentsForUnit}
+        onClose={() => setViewingCommentsForUnit(null)}
+      />
     </div>
   );
 };
