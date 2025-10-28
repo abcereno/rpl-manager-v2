@@ -2,22 +2,23 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
-import { UserRole } from '@/types'; // Import your UserRole type
+import { UserRole } from '@/types';
 
 interface Profile {
   id: string;
   full_name?: string;
   avatar_url?: string;
   role: UserRole;
-  // Add other profile fields if needed
 }
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
-  loading: boolean;
+  // We can add back a loading state just for the *initial* check
+  initialLoading: boolean;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>; // Add a way to manually refresh
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,84 +27,89 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // Track initial load
 
-  useEffect(() => {
-    setLoading(true);
-    // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+  // Fetch profile function (remains the same)
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+    try {
+      const { data, error, status } = await supabase
+        .from('profiles')
+        .select(`id, full_name, avatar_url, role`)
+        .eq('id', userId)
+        .single();
+
+      if (error && status !== 406) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+      if (data) {
+        console.log("Profile fetched:", data);
+        return data as Profile;
       } else {
-        setLoading(false); // No user, stop loading
+        console.warn("No profile found for user:", userId);
+        return null;
       }
-    });
+    } catch (error) {
+      console.error('Exception fetching profile:', error);
+      return null;
+    }
+  };
 
-    // 2. Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        console.log("Auth state changed:", _event, session);
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        if (currentUser) {
-           await fetchProfile(currentUser.id); // Fetch profile on change
-        } else {
-          setProfile(null); // Clear profile on logout
-          setLoading(false); // Ensure loading stops on logout
-        }
+  // Function to manually check and update session state
+  const refreshSessionData = async () => {
+      setInitialLoading(true); // Indicate loading during refresh
+      try {
+          const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+          if (error) throw error;
+
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+
+          if (currentSession?.user) {
+              const fetchedProfile = await fetchProfile(currentSession.user.id);
+              setProfile(fetchedProfile);
+          } else {
+              setProfile(null);
+          }
+      } catch (err) {
+          console.error("Error refreshing session data:", err);
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+      } finally {
+          setInitialLoading(false); // Finish loading state
       }
-    );
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, []);
-
-  const fetchProfile = async (userId: string) => {
-     setLoading(true); // Start loading when fetching profile
-     try {
-       const { data, error, status } = await supabase
-         .from('profiles')
-         .select(`id, full_name, avatar_url, role`)
-         .eq('id', userId)
-         .single();
-
-       if (error && status !== 406) {
-         console.error('Error fetching profile:', error);
-         throw error;
-       }
-
-       if (data) {
-         console.log("Profile fetched:", data);
-         setProfile(data as Profile);
-       } else {
-           console.warn("No profile found for user:", userId);
-           setProfile(null); // Set profile to null if not found
-       }
-     } catch (error) {
-       console.error('Exception fetching profile:', error);
-       setProfile(null); // Clear profile on error
-     } finally {
-        setLoading(false); // Stop loading after fetch attempt
-     }
   };
 
 
+  // useEffect now ONLY runs once on mount to check initial state
+  useEffect(() => {
+    refreshSessionData(); // Call the refresh function on initial mount
+
+    // REMOVED onAuthStateChange listener entirely
+    // No return function needed to unsubscribe
+
+  }, []); // Empty dependency array ensures this runs only once
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) console.error('Error signing out:', error);
-    // State updates handled by onAuthStateChange listener
+    if (error) {
+        console.error('Error signing out:', error);
+    } else {
+        // Manually clear state after successful sign out
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+    }
   };
 
   const value = {
     session,
     user,
     profile,
-    loading,
+    initialLoading, // Provide the initial loading state
     signOut,
+    refreshSession: refreshSessionData, // Expose the refresh function
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

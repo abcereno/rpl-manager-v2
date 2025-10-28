@@ -1,84 +1,70 @@
-// src/components/AppLayout.tsx
-import { Header } from './Header'; //
-import { StudentDashboard } from './StudentDashboard'; //
-import { PortfolioTeamView } from './PortfolioTeamView'; //
-import { RTOAssessorView } from './RTOAssessorView'; //
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
-import { UserRole } from '../types'; //
-import { Skeleton } from "@/components/ui/skeleton"; //
-import { Button } from './ui/button'; //
-import { useState } from 'react';
-
-export default function AppLayout({ children }: { children: React.ReactNode }) {  const { profile, loading, signOut, user} = useAuth(); // Get profile, loading state, user and signOut from context
-
-   // Temporary role switching state, only if user is admin
-   const [tempViewRole, setTempViewRole] = useState<UserRole | null>(null);
-
-   const isAdmin = profile?.role === 'admin';
-   // Determine the role to display: temp view if set by admin, otherwise user's actual role
-   const displayRole = isAdmin && tempViewRole ? tempViewRole : profile?.role;
-
-   // Handler for role switching in header (only affects displayRole if admin)
-   const handleRoleViewChange = (role: UserRole) => {
-     if (isAdmin) {
-       setTempViewRole(role);
-     }
-     // Non-admins cannot change their view via the header buttons
-   };
+import React, { useState } from 'react';
+import { Outlet } from "react-router-dom"; // Import Outlet
+import { Header } from './Header';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '../types';
+import { Skeleton } from "@/components/ui/skeleton";
 
 
-  const renderView = () => {
-     if (loading || !profile) {
-        // Show loading skeletons while profile is loading or if profile is missing
-        return (
-          <div className="space-y-6">
-             <Skeleton className="h-24 w-full" />
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
-             </div>
-              <Skeleton className="h-64 w-full" />
-          </div>
-       );
-     }
+export default function AppLayout() {
+  // Assuming simplified AuthContext with initialLoading
+  const { profile, initialLoading, signOut, user } = useAuth();
+  const [tempViewRole, setTempViewRole] = useState<UserRole | null>(null);
 
+  // Check if the user is either 'admin' or 'portfolio_team'
+  const canManageViews = profile?.role === 'admin' || profile?.role === 'portfolio_team';
+  // Determine the role to display for header styling/controls
+  // If the user can manage views and has selected a temp role, use that, otherwise use their actual role
+  const displayRole = canManageViews && tempViewRole ? tempViewRole : profile?.role;
 
-    switch (displayRole) { // Use displayRole which respects admin temporary view
-      case 'student':
-        return <StudentDashboard />;
-      case 'portfolio_team':
-      case 'admin': // Admins see portfolio view by default unless switched
-        return <PortfolioTeamView />;
-      case 'rto_assessor':
-        return <RTOAssessorView />;
-      default:
-         console.warn("Unknown or missing role:", profile?.role, "Defaulting to Student Dashboard.");
-         // Fallback for unexpected roles or if profile fetch failed but user is logged in
-         return <StudentDashboard />;
+  const handleRoleViewChange = (role: UserRole) => {
+    // Only allow changing view if the user has the necessary permissions
+    if (canManageViews) {
+      setTempViewRole(role);
     }
   };
+
+  if (initialLoading) {
+     return (
+          <div className="min-h-screen flex items-center justify-center">
+             <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+                <Skeleton className="h-16 w-full" /> {/* Header Placeholder */}
+                <Skeleton className="h-64 w-full" /> {/* Main Content Placeholder */}
+             </div>
+          </div>
+       );
+  }
+
+  // Ensure profile is loaded before rendering the main layout
+  if (!profile) {
+      // This case might happen briefly even if initialLoading is false, handle gracefully
+       console.warn("AppLayout: Profile not available yet.");
+       return ( // Render a loading state or redirect if necessary
+           <div className="min-h-screen flex items-center justify-center">
+               <p>Loading user profile...</p>
+           </div>
+       );
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        // Pass the actual role or the temp role for highlighting the correct button
-        currentRole={displayRole || 'student'}
-        // Allow admins to change the temp view
+        // Pass the display role for header controls/styling
+        currentRole={displayRole || 'student'} // Use displayRole, fallback needed
         onRoleChange={handleRoleViewChange}
-        // Display user name from profile or fallback
         userName={profile?.full_name || user?.email || 'User'}
-        // Pass isAdmin flag to conditionally show role buttons in header
-        isAdmin={isAdmin}
-        onSignOut={signOut} // Pass signout function
+        // Pass the updated flag determining if admin controls should show
+        showAdminControls={canManageViews}
+        onSignOut={signOut}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {renderView()}
+        {/* Render the matched nested route component here */}
+        <Outlet />
       </main>
 
-      {/* Footer... (keep existing footer) */}
+      {/* Footer... */}
        <footer className="bg-[#373b40] text-white mt-16">
-         {/* ... Footer content remains the same ... */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                <div>
