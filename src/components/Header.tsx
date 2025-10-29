@@ -1,28 +1,99 @@
+// src/components/Header.tsx
 import React from 'react';
-import { UserRole } from '../types';
+import { UserRole } from '../types'; // Make sure UserRole includes 'admin'
 import { Button } from './ui/button';
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut, Settings, Users, Building, LayoutDashboard } from 'lucide-react'; // Added icons
 import { Link, useLocation } from 'react-router-dom';
-// Removed useAuth import as role info comes via props now
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth to get the actual role
 
 interface HeaderProps {
-  currentRole: UserRole | undefined; // Display role (can be temp for admins/portfolio)
-  onRoleChange: (role: UserRole) => void;
+  // Removed currentRole and onRoleChange as view switching is being removed for admin
   userName: string;
-  showAdminControls: boolean; // Renamed from isAdmin for clarity
+  // Removed showAdminControls, we'll use the actual role now
   onSignOut: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  currentRole,
-  onRoleChange,
   userName,
-  showAdminControls, // Use the new prop name
   onSignOut
 }) => {
   const location = useLocation();
+  const { profile } = useAuth(); // Get the profile which contains the role
+  const actualRole = profile?.role; // Get the user's real role
 
   const isNavLinkActive = (path: string) => location.pathname === path;
+
+  // Function to render navigation based on the actual role
+  const renderNavigation = () => {
+    switch (actualRole) {
+      case 'admin':
+        return (
+          <nav className="hidden md:flex gap-6 items-center">
+            <Link
+              to="/"
+              className={`flex items-center gap-1 font-semibold transition-colors ${
+                isNavLinkActive('/') ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </Link>
+            <Link
+              to="/admin/students" // New route for student list
+              className={`flex items-center gap-1 font-semibold transition-colors ${
+                isNavLinkActive('/admin/students') ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              Students
+            </Link>
+            <Link
+              to="/admin/rtos" // New route for RTO list
+              className={`flex items-center gap-1 font-semibold transition-colors ${
+                isNavLinkActive('/admin/rtos') ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
+              }`}
+            >
+              <Building className="h-4 w-4" />
+              RTOs
+            </Link>
+            <Link
+              to="/admin/manage" // Existing route for settings/management
+              className={`flex items-center gap-1 font-semibold transition-colors ${
+                isNavLinkActive('/admin/manage') ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              Settings
+            </Link>
+          </nav>
+        );
+      case 'portfolio_team':
+        // Portfolio team still needs view switching? Or specific links?
+        // Keeping view switching for now as per previous logic for non-admin managers
+        // You might want dedicated links like admin later.
+         return (
+             <nav className="hidden md:flex gap-6 items-center">
+                 {/* Re-implement view switching logic here if needed */}
+                 {/* For now, just showing the manage link */}
+                 <Link
+                   to="/admin/manage" // Assuming portfolio team uses the same management page
+                   className={`flex items-center gap-1 font-semibold transition-colors ${
+                     isNavLinkActive('/admin/manage') ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
+                   }`}
+                 >
+                   <Settings className="h-4 w-4" />
+                   Manage Users
+                 </Link>
+             </nav>
+         );
+        // Add cases for 'student' and 'rto_assessor' if they need specific links,
+        // otherwise they will render nothing, which is the desired outcome.
+      case 'student':
+      case 'rto_assessor':
+      default:
+        return null; // No extra nav links for students or assessors
+    }
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
@@ -38,51 +109,8 @@ export const Header: React.FC<HeaderProps> = ({
                 />
             </Link>
 
-             {/* Admin/Portfolio-Specific Navigation */}
-             {showAdminControls && ( // Use the new prop name here
-               <nav className="hidden md:flex gap-6 items-center">
-                 {/* View Switching Buttons */}
-                 <button
-                   onClick={() => onRoleChange('student')}
-                   className={`font-semibold transition-colors ${
-                     currentRole === 'student' ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
-                   }`}
-                 >
-                   Student View
-                 </button>
-                 <button
-                   onClick={() => onRoleChange('portfolio_team')}
-                   className={`font-semibold transition-colors ${
-                     (currentRole === 'portfolio_team' || currentRole === 'admin') ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]' // Highlight for both admin/portfolio if viewing portfolio
-                   }`}
-                 >
-                   Portfolio View
-                 </button>
-                 <button
-                   onClick={() => onRoleChange('rto_assessor')}
-                   className={`font-semibold transition-colors ${
-                     currentRole === 'rto_assessor' ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
-                   }`}
-                 >
-                   RTO View
-                 </button>
-
-                 {/* Separator */}
-                 <div className="h-6 w-px bg-gray-200"></div>
-
-                 {/* Admin Management Link */}
-                 <Link
-                   to="/admin/manage"
-                   className={`flex items-center gap-1 font-semibold transition-colors ${
-                     isNavLinkActive('/admin/manage') ? 'text-[#fdb715]' : 'text-gray-600 hover:text-[#373b40]'
-                   }`}
-                 >
-                   <Settings className="h-4 w-4" />
-                   Manage Users
-                 </Link>
-               </nav>
-             )}
-             {/* No extra links needed for student or rto_assessor roles */}
+             {/* Role-Specific Navigation */}
+             {renderNavigation()}
 
           </div>
           <div className="flex items-center gap-4">
