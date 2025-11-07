@@ -34,12 +34,11 @@ interface RawFetchedStudentData {
   enrolled_date: string | null;
   company_id: string | null;
   created_at?: string | null;
-  profile: {
-    id: string;
-    full_name: string | null;
-    email: string | null;
-    avatar_url: string | null;
-  } | null;
+  // --- MODIFIED: Removed profile join ---
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  // --- END MODIFICATION ---
   assigned_admin: {
     full_name: string | null;
   } | null;
@@ -59,7 +58,6 @@ const fetchStudents = async (page: number, searchTerm: string, filterStatus: str
   const from = (page - 1) * ITEMS_PER_PAGE;
   const to = from + ITEMS_PER_PAGE - 1;
 
-  // --- VALID select (no comments), explicit FK hints, inner join only where needed ---
   let query = supabase
     .from('students')
     .select(`
@@ -70,9 +68,11 @@ const fetchStudents = async (page: number, searchTerm: string, filterStatus: str
       enrolled_date,
       company_id,
       created_at,
-      profile:profiles!students_profile_id_fkey (
-        id, full_name, email, avatar_url
-      ),
+      -- --- MODIFIED: Removed profile join, added direct columns ---
+      full_name,
+      email,
+      avatar_url,
+      -- --- END MODIFICATION ---
       assigned_admin:profiles!students_assigned_admin_id_fkey (
         full_name
       ),
@@ -90,10 +90,11 @@ const fetchStudents = async (page: number, searchTerm: string, filterStatus: str
 
   if (searchTerm?.trim()) {
     const term = searchTerm.trim();
-    // OR across related fields is supported via dot-notation
+    // --- MODIFIED: Search full_name directly on students table ---
     query = query.or(
-      `profile.full_name.ilike.%${term}%,offer.qualification.name.ilike.%${term}%`
+      `full_name.ilike.%${term}%,offer.qualification.name.ilike.%${term}%`
     );
+    // --- END MODIFICATION ---
   }
 
   const { data, error, count } = await query;
@@ -107,9 +108,11 @@ const fetchStudents = async (page: number, searchTerm: string, filterStatus: str
 
   const transformedData: Student[] = rawData.map(s => ({
     id: s.id,
-    name: s.profile?.full_name || 'N/A',
-    email: s.profile?.email || 'N/A',
-    avatar: s.profile?.avatar_url || '/placeholder.svg',
+    // --- MODIFIED: Map new direct columns ---
+    name: s.full_name || 'N/A',
+    email: s.email || 'N/A',
+    avatar: s.avatar_url || '/placeholder.svg',
+    // --- END MODIFICATION ---
     course: s.offer?.qualification?.name || 'N/A',
     enrolledDate: new Date(s.enrolled_date || Date.now()),
     progress: s.progress || 0,
